@@ -82,22 +82,19 @@ DELETE /api/member/me
 - 탈퇴 후 해당 회원의 모든 Refresh Token을 폐기한다.
 
 POST /api/member/find-id
-- `FindIdRequest`(name, email)를 입력받아 아이디 찾기를 수행한다.
+- `FindIdRequest`(name, birthDate)를 입력받아 아이디 찾기를 수행한다.
 - 성공 시 마스킹된 login_id를 `FindIdResponse`로 반환한다.
 
-POST /api/member/find-password
-- `FindPasswordRequest`(loginId, email)를 입력받아 비밀번호 재설정 링크를 메일로 발송한다.
-
 POST /api/member/reset-password
-- `ResetPasswordRequest`(token, newPassword)를 입력받아 비밀번호를 재설정한다.
-- 토큰이 만료/무효하면 실패 응답을 반환한다.
+- `ResetPasswordRequest`(loginId, name, birthDate, newPassword)를 입력받아 본인 확인 후 비밀번호를 재설정한다.
+- loginId + name + birthDate 조합이 일치하지 않으면 `UserNotFoundException`을 던진다.
 
 ---
 
 ## 4. Service 계층
 
 #### MemberService.java (인터페이스)
-- 컨트롤러는 이 인터페이스에만 의존한다.
+- 컨트롤러가 의존할 인터페이스
 
 #### MemberServiceImpl.java
 
@@ -143,16 +140,12 @@ POST /api/member/reset-password
 3. 해당 회원의 모든 Refresh Token을 일괄 폐기(`revoked = true`)한다.
 
 **아이디 찾기 — findId(FindIdRequest)**
-1. name + email 조합으로 사용자를 조회한다.
-2. 매칭되는 회원이 있으면 마스킹된 login_id를 `FindIdResponse`로 반환한다. (예: `user***`)
+1. name + birthDate 조합으로 사용자를 조회한다.
+2. 매칭되는 회원이 있으면 마스킹된 login_id를 `FindIdResponse`로 반환한다. (예: `gild***`)
 3. 매칭 실패 시 `UserNotFoundException`을 던진다.
 
-**비밀번호 찾기 — sendPasswordResetLink(FindPasswordRequest)**
-1. loginId + email로 사용자를 조회한다.
-2. 재설정용 임시 토큰을 생성하고 메일로 발송한다.
-
 **비밀번호 재설정 — resetPassword(ResetPasswordRequest)**
-1. 토큰의 유효성과 만료 여부를 검증한다.
+1. loginId + name + birthDate 조합으로 사용자를 조회한다. 일치하는 회원이 없으면 `UserNotFoundException`을 던진다.
 2. 새 비밀번호를 해시 처리하여 덮어쓴다.
 3. 보안을 위해 해당 회원의 모든 Refresh Token을 일괄 폐기한다.
 
@@ -182,8 +175,8 @@ POST /api/member/reset-password
 #### UserRepository.java
 - `findByLoginId(loginId)` → 로그인, 아이디 중복 확인
 - `findByEmail(email)` → 이메일 중복 확인
-- `findByNameAndEmail(name, email)` → 아이디 찾기
-- `findByLoginIdAndEmail(loginId, email)` → 비밀번호 찾기
+- `findByNameAndBirthDate(name, birthDate)` → 아이디 찾기
+- `findByLoginIdAndNameAndBirthDate(loginId, name, birthDate)` → 비밀번호 재설정 본인 확인
 - `existsByLoginId(loginId)` → 가입 시 login_id 중복 검증
 - `existsByEmail(email)` → 가입 시 email 중복 검증
 
@@ -213,13 +206,10 @@ POST /api/member/reset-password
 - reason(선택) — 탈퇴 사유
 
 **FindIdRequest**
-- name(필수), email(필수) — 이름+이메일로 login_id 찾기
-
-**FindPasswordRequest**
-- loginId(필수), email(필수) — 본인 확인 후 재설정 링크 발송
+- name(필수), birthDate(필수) — 이름+생년월일로 login_id 찾기
 
 **ResetPasswordRequest**
-- token(필수), newPassword(필수)
+- loginId(필수), name(필수), birthDate(필수), newPassword(필수) — 본인 확인 후 바로 재설정
 
 #### Response DTO
 
@@ -238,7 +228,7 @@ POST /api/member/reset-password
 **TokenRefreshResponse**
 - accessToken
 
-**ApiResponse\<T\> (공통 래퍼)**
+**ApiResponse\<T\> **
 - status(HTTP 상태 코드), message(결과 메시지), data(T)
 
 ---
@@ -261,14 +251,14 @@ POST /api/member/reset-password
 
 #### SecurityConfig.java (global.config)
 - JWT 인증 필터를 Security Filter Chain에 삽입한다.
-- 인증 불필요 엔드포인트: `/signup`, `/login`, `/find-id`, `/find-password`, `/reset-password`
+- 인증 불필요 엔드포인트: `/signup`, `/login`, `/find-id`, `/reset-password`
 - 그 외 엔드포인트는 인증된 사용자만 접근 가능하다.
 
 ---
 
 ## 9. Exception 계층
 
-**(도메인별 예외를 정의하고, 전역 핸들러에서 `ApiResponse` 포맷으로 일관된 에러 응답을 반환하는 역할.)**
+**(도메인별 예외를 정의, 전역 핸들러에서 `ApiResponse` 형식으로 일관된 에러 반환)**
 
 - `UserNotFoundException` → 존재하지 않는 회원 (탈퇴 포함)
 - `DuplicateLoginIdException` → login_id 중복
@@ -290,7 +280,7 @@ POST /api/member/reset-password
 
 # API 명세서
 
-**Base URL:** `http://localhost:8080`
+**기본 URL:** `http://localhost:8080`
 **공통 응답:** `{ "status": int, "message": string, "data": object }`
 
 ---
@@ -479,9 +469,15 @@ POST /api/member/reset-password
 
 **인증:** 불필요
 
+**Request Body**
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| name | String | O | 가입 시 등록한 이름 |
+| birthDate | String | O | 생년월일 (YYYY-MM-DD) |
+
 ```json
 // Request
-{ "name": "홍길동", "email": "gildongi@gachon.ac.kr" }
+{ "name": "홍길동", "birthDate": "2003-05-10" }
 
 // Response 200
 {
@@ -495,33 +491,32 @@ POST /api/member/reset-password
 
 ---
 
-### 10. 비밀번호 찾기 (재설정 링크 발송) `POST /api/member/find-password`
+### 10. 비밀번호 재설정 `POST /api/member/reset-password`
 
 **인증:** 불필요
 
-```json
-// Request
-{ "loginId": "gildong2003", "email": "gildongi@gachon.ac.kr" }
-
-// Response 200
-{ "status": 200, "message": "비밀번호 재설정 메일이 발송되었습니다.", "data": null }
-```
-
----
-
-### 11. 비밀번호 재설정 `POST /api/member/reset-password`
-
-**인증:** 불필요
+**Request Body**
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| loginId | String | O | 로그인 아이디 |
+| name | String | O | 가입 시 등록한 이름 |
+| birthDate | String | O | 생년월일 (YYYY-MM-DD) |
+| newPassword | String | O | 새 비밀번호 |
 
 ```json
 // Request
-{ "token": "a1b2c3d4...", "newPassword": "Newpass1234!" }
+{
+  "loginId": "gildong2003",
+  "name": "홍길동",
+  "birthDate": "2003-05-10",
+  "newPassword": "Newpass1234!"
+}
 
 // Response 200
 { "status": 200, "message": "비밀번호가 재설정되었습니다.", "data": null }
 ```
 
-**Error:** 400 토큰 만료/무효 / 400 Validation 실패
+**Error:** 404 loginId+name+birthDate 불일치 / 400 Validation 실패
 
 ---
 
@@ -529,13 +524,13 @@ POST /api/member/reset-password
 
 | API 구분 | Access Token | Refresh Cookie |
 |---|---|---|
-| 공개 (signup, login, find-id, find-password, reset-password) | X | X |
+| 공개 (signup, login, find-id, reset-password) | X | X |
 | 인증 (me, verify-password, logout) | O | X |
 | 토큰 재발급 (token/refresh) | X | O |
 
 ---
 
-## 요구사항 ↔ API 매핑
+## 요구사항과 API 매핑(요구사항 설계 당시 짠 유스케이스 명세서 기준)
 
 | 요구사항 | API | UC |
 |---|---|---|
@@ -545,4 +540,4 @@ POST /api/member/reset-password
 | FR-04 정보 조회 | GET /api/member/me | UC-A04 |
 | FR-05 정보 수정 | POST /api/member/me/verify-password → PUT /api/member/me | UC-A05 |
 | FR-06 회원 탈퇴 | POST /api/member/me/verify-password → DELETE /api/member/me | UC-A06 |
-| FR-07 아이디/비밀번호 찾기 | POST /find-id, /find-password, /reset-password | UC-A07 |
+| FR-07 아이디/비밀번호 찾기 | POST /find-id, /reset-password | UC-A07 |
