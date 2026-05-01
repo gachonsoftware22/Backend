@@ -15,33 +15,44 @@
 | Column | Type | Constraint | Description |
 |--------|------|-----------|------------|
 | user_id | BIGINT | PK, AUTO_INCREMENT | 사용자 ID |
+| login_id | VARCHAR(50) | UNIQUE, NOT NULL | 로그인 ID |
 | email | VARCHAR(100) | UNIQUE, NOT NULL | 이메일 |
 | password | VARCHAR(255) | NOT NULL | 비밀번호 |
 | name | VARCHAR(50) | NOT NULL | 이름 |
 | phone | VARCHAR(20) |  | 전화번호 |
-| birth_date | DATE |  | 생년월일 |
+| birth_date | DATE | NOT NULL | 생년월일 |
 | gender | CHAR(1) |  | 성별 |
-| status | VARCHAR(10) | DEFAULT 'ACTIVE' | 상태 |
-| created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 생성일 |
+| status | VARCHAR(10) | NOT NULL, DEFAULT 'ACTIVE' | 상태 |
+| created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 생성일 |
 | updated_at | DATETIME |  | 수정일 |
 
----
+### Refresh Token Table
+| Column | Type | Constraint | Description |
+|--------|------|-----------|------------|
+| token_id | BIGINT | PK, AUTO_INCREMENT | 토큰 ID |
+| user_id | BIGINT | FK(users.user_id), NOT NULL | 사용자 ID |
+| token_hash | VARCHAR(255) | UNIQUE, NOT NULL | 리프레시 토큰 해시 |
+| expires_at | DATETIME | NOT NULL | 만료일 |
+| revoked | BOOLEAN | NOT NULL, DEFAULT false | 폐기 여부 |
+| created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 생성일 |
 
 ### Health Table
 | Column | Type | Constraint | Description |
 |--------|------|-----------|------------|
-| health_id | BIGINT | PK, AUTO_INCREMENT | 건강 ID |
-| user_id | BIGINT | FK(user.user_id), NOT NULL | 사용자 ID |
+| health_id | BIGINT | PK, AUTO_INCREMENT | 건강 정보 ID |
+| user_id | BIGINT | FK(users.user_id), NOT NULL | 사용자 ID |
 | symptom | TEXT | NOT NULL | 증상 |
 | history | TEXT |  | 병력 |
 | note | TEXT |  | 메모 |
-| created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 생성일 |
+| record_date | DATE | NOT NULL | 기록 날짜 |
+| created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 생성일 |
 | updated_at | DATETIME |  | 수정일 |
 
 ---
 
 ## 3. ERD
-User (1) : (N) Health
+- User (1) : (N) Health
+- User (1) : (N) RefreshToken
 
 ---
 
@@ -49,51 +60,111 @@ User (1) : (N) Health
 
 ### Auth
 - POST /api/auth/signup → 회원가입
-- POST /api/auth/login → 로그인 (JWT 발급)
+- POST /api/auth/login → 로그인
 - POST /api/auth/logout → 로그아웃
 - GET /api/auth/me → 사용자 정보 조회
 
 ### Health
 - POST /api/health → 건강 정보 등록
-- GET /api/health → 목록 조회
-- GET /api/health/{id} → 상세 조회
-- PUT /api/health/{id} → 수정
-- DELETE /api/health/{id} → 삭제
+- GET /api/health → 건강 정보 목록 조회
+- GET /api/health/{id} → 건강 정보 상세 조회
+- PUT /api/health/{id} → 건강 정보 수정
+- DELETE /api/health/{id} → 건강 정보 삭제
 
 ---
 
-## 5. Structure (MVC)
+## 5. Flow Specification
 
-- Controller: API 요청 처리
+### Signup Flow
+- Input: SignupRequestDto(loginId, email, password, name, birthDate)
+- Success: UserResponseDto 반환
+- Fail:
+  - 중복된 loginId 또는 email이면 DuplicateUserException 발생
+  - 필수 입력값이 비어있으면 InvalidRequestException 발생
+
+### Login Flow
+- Input: LoginRequestDto(loginId 또는 email, password)
+- Success: AuthToken(accessToken, refreshToken) 반환
+- Fail:
+  - 아이디/비밀번호 불일치 시 InvalidCredentialException 발생
+  - 비활성 계정이면 AccountInactiveException 발생
+
+### Logout Flow
+- Input: LogoutRequestDto(refreshToken)
+- Success: 해당 refreshToken 폐기 처리
+- Fail:
+  - 유효하지 않은 토큰이면 InvalidTokenException 발생
+
+### Get Current User Flow
+- Input: Authorization Header의 accessToken
+- Success: UserResponseDto 반환
+- Fail:
+  - 토큰이 없거나 만료되면 UnauthorizedException 발생
+
+### Health Create Flow
+- Input: HealthRequestDto(symptom, history, note, recordDate)
+- Success: HealthResponseDto 반환
+- Fail:
+  - 로그인하지 않은 사용자는 UnauthorizedException 발생
+  - symptom 또는 recordDate가 비어있으면 InvalidHealthDataException 발생
+
+### Health List Flow
+- Input: Authorization Header의 accessToken
+- Success: 사용자의 HealthResponseDto 목록 반환
+- Fail:
+  - 로그인하지 않은 사용자는 UnauthorizedException 발생
+
+### Health Update Flow
+- Input: healthId, HealthRequestDto
+- Success: 수정된 HealthResponseDto 반환
+- Fail:
+  - 존재하지 않는 건강 정보이면 HealthNotFoundException 발생
+  - 본인의 건강 정보가 아니면 ForbiddenException 발생
+
+### Health Delete Flow
+- Input: healthId
+- Success: 건강 정보 삭제
+- Fail:
+  - 존재하지 않는 건강 정보이면 HealthNotFoundException 발생
+  - 본인의 건강 정보가 아니면 ForbiddenException 발생
+
+---
+
+## 6. Structure
+
+- Controller: 클라이언트 API 요청 처리
 - Service: 비즈니스 로직 처리
-- Repository: DB 접근
-- Entity: DB 테이블 매핑
+- Repository: DB 접근 및 쿼리 수행
+- Entity: DB 테이블과 매핑
 - DTO: Request / Response 데이터 전달
+- JWT: 인증 토큰 발급 및 검증
 
 ---
 
-## 6. Controller / Service Detail
+## 7. Controller / Service Detail
 
 ### AuthController.java
-- POST /api/auth/signup → 회원가입
-- POST /api/auth/login → 로그인
-- POST /api/auth/logout → 로그아웃
-- GET /api/auth/me → 사용자 조회
+- signup()
+- login()
+- logout()
+- getCurrentUser()
 
 ### AuthService.java
-- signup() → 사용자 생성 (중복 체크, 암호화)
-- login() → 로그인 및 JWT 발급
-- logout() → 로그아웃 처리
-- getCurrentUser() → 사용자 조회
+- signup()
+- login()
+- logout()
+- getCurrentUser()
 
----
+### AuthServiceImpl.java
+- AuthService 인터페이스 구현체
+- 인증 관련 실제 비즈니스 로직 처리
 
 ### HealthController.java
-- POST /api/health → 등록
-- GET /api/health → 목록 조회
-- GET /api/health/{id} → 상세 조회
-- PUT /api/health/{id} → 수정
-- DELETE /api/health/{id} → 삭제
+- createHealth()
+- getHealthList()
+- getHealthDetail()
+- updateHealth()
+- deleteHealth()
 
 ### HealthService.java
 - createHealth()
@@ -102,39 +173,49 @@ User (1) : (N) Health
 - updateHealth()
 - deleteHealth()
 
+### HealthServiceImpl.java
+- HealthService 인터페이스 구현체
+- 건강 정보 관련 실제 비즈니스 로직 처리
+
 ---
 
-## 7. Repository
+## 8. Repository
 
 - UserRepository
+- RefreshTokenRepository
 - HealthRepository
 
 ---
 
-## 8. Entity
+## 9. Entity
 
 - User
+- RefreshToken
 - Health
 
 ---
 
-## 9. DTO
+## 10. DTO
 
+### Auth DTO
 - SignupRequestDto
 - LoginRequestDto
 - LoginResponseDto
 - LogoutRequestDto
 - UserResponseDto
+
+### Health DTO
 - HealthRequestDto
 - HealthResponseDto
 
 ---
 
-## 10. JWT
+## 11. JWT
 
 ### Header
 Authorization: Bearer {accessToken}
 
 ### Description
-- 로그인 성공 시 JWT 토큰 발급
-- 이후 API 요청 시 Authorization 헤더에 포함
+- 로그인 성공 시 accessToken과 refreshToken을 발급한다.
+- accessToken은 인증이 필요한 API 요청 시 Authorization Header에 포함한다.
+- refreshToken은 accessToken 재발급 또는 로그아웃 처리 시 사용한다.
