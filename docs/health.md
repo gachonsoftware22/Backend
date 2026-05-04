@@ -140,11 +140,7 @@ classDiagram
         -LocalDateTime updatedAt
     }
 
-    %% ── Exception ───────────────────────────────────────
-    class HealthNotFoundException {
-        <<RuntimeException>>
-        +HealthNotFoundException(String message)
-    }
+
 
     %% ── Global (재사용) ──────────────────────────────────
     class ApiResponse~T~ {
@@ -164,7 +160,6 @@ classDiagram
     HealthController ..> HealthRequestDto    : uses
     HealthController ..> HealthResponseDto   : uses
     HealthController ..> ApiResponse         : wraps response
-    HealthServiceImpl ..> HealthNotFoundException : throws
     HealthServiceImpl ..> HealthRequestDto   : reads
     HealthServiceImpl ..> HealthResponseDto  : returns
 ```
