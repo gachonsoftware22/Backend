@@ -162,15 +162,15 @@ com.swe.backend
 | DELETE | /api/prescription/delete/{prescription_id} | Soft Delete (status → DELETED) |
 
 ### AI Result
-| 메서드 | URL | 권한 | 설명 |
-|--------|-----|------|------|
-| POST | /api/ai/trigger | ADMIN | AI 분석 수동 실행 |
-| GET | /api/ai/result/{userId} | 본인/ADMIN | 최신 분석 결과 전체 |
-| GET | /api/ai/result/{userId}/summary | 본인/ADMIN | health_status + summary_note |
-| GET | /api/ai/result/{userId}/diseases | 본인/ADMIN | potential_diseases |
-| GET | /api/ai/result/{userId}/foods | 본인/ADMIN | recommended_foods |
-| GET | /api/ai/result/{userId}/exercises | 본인/ADMIN | recommended_exercises |
-| GET | /api/ai/result/{userId}/precautions | 본인/ADMIN | precautions |
+| 메서드 | URL                                 | 권한       | 설명 |
+|--------|-------------------------------------|----------|------|
+| POST | /api/ai/trigger                     | 사용자      | AI 분석 수동 실행 |
+| GET | /api/ai/result/me                   | 사용자   | 최신 분석 결과 전체 |
+| GET | /api/ai/result/me  /summary     | 사용자   | health_status + summary_note |
+| GET | /api/ai/result/me  /diseases    | 사용자  | potential_diseases |
+| GET | /api/ai/result/me  /foods       | 사용자   | recommended_foods |
+| GET | /api/ai/result/me  /exercises   | 사용자   | recommended_exercises |
+| GET | /api/ai/result/me  /precautions | 사용자   | precautions |
 
 ---
 
