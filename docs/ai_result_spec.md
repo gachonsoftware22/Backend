@@ -1,7 +1,7 @@
 ## AI Result Domain Specification
 
 #### Overview
-관리자가 특정 사용자의 건강정보 및 처방전 데이터를 LLM API에 전달하여 AI 건강 분석 결과를 생성하고,
+사용자가 특정 사용자의 건강정보 및 처방전 데이터를 LLM API에 전달하여 AI 건강 분석 결과를 생성하고,
 그 결과를 저장·조회하는 기능을 제공한다.
 분석 결과는 health_status / summary_note / potential_diseases / recommended_foods / recommended_exercises / precautions 항목으로 구성되며,
 각 항목은 프론트엔드 화면에 개별 위젯으로 표시된다.
@@ -12,13 +12,13 @@
 
 ##### AiController.java
 (클라이언트 요청 처리)
-- POST /api/ai/trigger         → 관리자가 특정 사용자의 AI 분석을 수동 실행한다.
-- GET  /api/ai/result/{userId} → 해당 사용자의 최신 AI 분석 결과 전체를 반환한다.
-- GET  /api/ai/result/{userId}/summary       → 요약 항목(health_status, summary_note, analysis_date)만 반환한다.
-- GET  /api/ai/result/{userId}/diseases      → potential_diseases(JSON 배열) 반환한다.
-- GET  /api/ai/result/{userId}/foods         → recommended_foods(JSON 배열) 반환한다.
-- GET  /api/ai/result/{userId}/exercises     → recommended_exercises(JSON 배열) 반환한다.
-- GET  /api/ai/result/{userId}/precautions   → precautions(text) 반환한다.
+- POST /api/ai/trigger         → 사용자가 특정 사용자의 AI 분석을 수동 실행한다.
+- GET  /api/ai/result/me → 해당 사용자의 최신 AI 분석 결과 전체를 반환한다.
+- GET  /api/ai/result/me/summary       → 요약 항목(health_status, summary_note, analysis_date)만 반환한다.
+- GET  /api/ai/result/me/diseases      → potential_diseases(JSON 배열) 반환한다.
+- GET  /api/ai/result/me/foods         → recommended_foods(JSON 배열) 반환한다.
+- GET  /api/ai/result/me/exercises     → recommended_exercises(JSON 배열) 반환한다.
+- GET  /api/ai/result/me/precautions   → precautions(text) 반환한다.
 
 ##### AiDomainService.java (인터페이스)
 Controller가 직접 의존하는 파사드 서비스.
@@ -163,8 +163,8 @@ String prescriptionCsv      // prescription + prescription_detail 조인 CSV
 ##### 1. AI 분석 트리거 (관리자 전용)
 
 - **URL**: `POST /api/ai/trigger`
-- **설명**: 관리자가 특정 사용자의 최신 건강·처방 데이터를 LLM에 전달하여 AI 분석을 실행하고 결과를 저장한다. 동기 처리.
-- **권한**: ADMIN
+- **설명**: 사용자가 자신 최신 건강·처방 데이터를 LLM에 전달하여 AI 분석을 실행하고 결과를 저장한다. 동기 처리.
+
 
 **Request Header**
 ```
@@ -211,7 +211,7 @@ Content-Type: application/json
 
 ##### 2. AI 분석 결과 전체 조회
 
-- **URL**: `GET /api/ai/result/{userId}`
+- **URL**: `GET /api/ai/result/me`
 - **설명**: 해당 사용자의 가장 최근 AI 분석 결과 전체를 반환한다.
 - **권한**: 본인 또는 ADMIN
 
@@ -253,9 +253,9 @@ Authorization: Bearer {accessToken}
 
 ##### 3. 건강 요약 조회
 
-- **URL**: `GET /api/ai/result/{userId}/summary`
+- **URL**: `GET /api/ai/result/me/summary`
 - **설명**: health_status, summary_note, analysis_date만 반환한다. 메인 대시보드 카드 위젯에 사용.
-- **권한**: 본인 또는 ADMIN
+
 
 **Response (200 OK)**
 ```json
@@ -278,9 +278,9 @@ Authorization: Bearer {accessToken}
 
 ##### 4. 추정 질환 목록 조회
 
-- **URL**: `GET /api/ai/result/{userId}/diseases`
+- **URL**: `GET /api/ai/result/me/diseases`
 - **설명**: potential_diseases 배열만 반환한다.
-- **권한**: 본인 또는 ADMIN
+
 
 **Response (200 OK)**
 ```json
@@ -293,9 +293,9 @@ Authorization: Bearer {accessToken}
 
 ##### 5. 권장 식품 목록 조회
 
-- **URL**: `GET /api/ai/result/{userId}/foods`
+- **URL**: `GET /api/ai/result/me/foods`
 - **설명**: recommended_foods 배열만 반환한다.
-- **권한**: 본인 또는 ADMIN
+
 
 **Response (200 OK)**
 ```json
@@ -308,9 +308,9 @@ Authorization: Bearer {accessToken}
 
 ##### 6. 권장 운동 목록 조회
 
-- **URL**: `GET /api/ai/result/{userId}/exercises`
+- **URL**: `GET /api/ai/result/me/exercises`
 - **설명**: recommended_exercises 배열만 반환한다.
-- **권한**: 본인 또는 ADMIN
+
 
 **Response (200 OK)**
 ```json
@@ -323,9 +323,9 @@ Authorization: Bearer {accessToken}
 
 ##### 7. 주의사항 조회
 
-- **URL**: `GET /api/ai/result/{userId}/precautions`
+- **URL**: `GET /api/ai/result/me/precautions`
 - **설명**: precautions 텍스트만 반환한다.
-- **권한**: 본인 또는 ADMIN
+
 
 **Response (200 OK)**
 ```json
